@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Controle de Validade com Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Firebase SDK (compat para auth) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
+
+  <!-- Fonte e estilo -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #f8f9fa;
+      padding: 20px;
+      margin: 0;
+    }
+    h1 {
+      color: #007bff;
+      text-align: center;
+      margin-bottom: 20px;
+      font-weight: 700;
+      font-size: 2rem;
+    }
+    h2 {
+      color: #28a745;
+      font-size: 1.6rem;
+      font-weight: 500;
+    }
+    input, select {
+      padding: 10px;
+      margin: 5px;
+      width: 200px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 1rem;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      font-size: 1rem;
+      font-weight: 500;
+    }
+    .btn-danger {
+      background-color: #dc3545;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+    .btn-danger:hover {
+      background-color: #c82333;
+    }
+    .form-container {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+    }
+    .form-container label {
+      display: inline-block;
+      width: 120px;
+      font-weight: 500;
+    }
+    .form-container input,
+    .form-container select {
+      width: calc(100% - 130px);
+      display: inline-block;
+    }
+    .form-container button {
+      margin-top: 15px;
+      display: block;
+      width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 12px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background-color: #e9f7ef;
+      color: #007bff;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    td {
+      font-size: 1rem;
+      color: #555;
+    }
+    .table-container {
+      margin-top: 40px;
+    }
+    #login-box {
+      max-width: 400px;
+      margin: 100px auto;
+      padding: 30px;
+      background: white;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      border-radius: 10px;
+      text-align: center;
+    }
+    #login-box input {
+      width: 90%;
+      margin-bottom: 10px;
+    }
+    #sistema {
+      display: none;
+    }
+    #logout {
+      background-color: #dc3545;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-box">
+  <h2>Login</h2>
+  <input type="email" id="email" placeholder="E-mail" required><br>
+  <input type="password" id="senha" placeholder="Senha" required><br>
+  <button onclick="login()">Entrar</button>
+</div>
+
+<!-- SISTEMA -->
+<div id="sistema">
+  <h1>Controle de Validade de Produtos</h1>
+
+  <div class="form-container">
+    <h2>Adicionar Novo Produto</h2>
+    <form id="adicionarProdutoForm">
+      <label for="produto">Produto:</label>
+      <input type="text" id="produto" required><br><br>
+
+      <label for="medida">Medida:</label>
+      <select id="medida" required>
+        <option value="kg">Kg</option>
+        <option value="L">L</option>
+        <option value="g">g</option>
+        <option value="ml">ml</option>
+        <option value="unidade">Unidade</option>
+      </select><br><br>
+
+      <label for="quantidade">Quantidade:</label>
+      <input type="number" id="quantidade" required><br><br>
+
+      <label for="validade">Validade:</label>
+      <input type="date" id="validade" required><br><br>
+
+      <button type="submit">Adicionar Produto</button>
+    </form>
+  </div>
+
+  <div class="table-container">
+    <h2>Lista de Produtos</h2>
+    <table id="produtosTabela">
+      <thead>
+        <tr>
+          <th>Produto</th>
+          <th>Medida</th>
+          <th>Quantidade</th>
+          <th>Validade</th>
+          <th>Status</th>
+          <th>Ação</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <button onclick="baixarExcel()">Baixar Excel</button>
+    <button id="logout">Sair</button>
+  </div>
+</div>
+
+<!-- SCRIPT -->
+<script>
+  // 🔐 Firebase config personalizada
+  const firebaseConfig = {
+    apiKey: "AIzaSyAcDeqTrmIg30mpkAp2a9ctEGH5iuLibw4",
+    authDomain: "controle-validade-d2e14.firebaseapp.com",
+    projectId: "controle-validade-d2e14",
+    storageBucket: "controle-validade-d2e14.firebasestorage.app",
+    messagingSenderId: "252000133537",
+    appId: "1:252000133537:web:91f4ae48a3ac8300e72be0",
+    measurementId: "G-2Y1JV3KMXV"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+
+  function login() {
+    const email = document.getElementById("email").value;
+    const senha = document.getElementById("senha").value;
+
+    auth.signInWithEmailAndPassword(email, senha)
+      .then(() => {
+        document.getElementById("login-box").style.display = "none";
+        document.getElementById("sistema").style.display = "block";
+      })
+      .catch(err => alert("Erro: " + err.message));
+  }
+
+  function logout() {
+    auth.signOut().then(() => {
+      document.getElementById("sistema").style.display = "none";
+      document.getElementById("login-box").style.display = "block";
+    });
+  }
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      document.getElementById("login-box").style.display = "none";
+      document.getElementById("sistema").style.display = "block";
+    }
+  });
+
+  // ========== SISTEMA ==========
+  function formatarData(data) {
+    const d = new Date(data);
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const ano = d.getFullYear();
+    return `${dia}/${mes}/${ano}`;
+  }
+
+  function calcularStatus(validade) {
+    const hoje = new Date();
+    const dataValidade = new Date(validade);
+    const diffTime = dataValidade - hoje;
+    const diffDays = Math.ceil(diffTime / (1000 * 3600 * 24));
+
+    if (diffDays < 0) return "Venceu há " + Math.abs(diffDays) + " dias";
+    else if (diffDays === 0) return "Vence hoje";
+    else if (diffDays === 1) return "Vence amanhã";
+    else return "Vence em " + diffDays + " dias";
+  }
+
+  document.getElementById('adicionarProdutoForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+
+    const produto = document.getElementById('produto').value;
+    const medida = document.getElementById('medida').value;
+    const quantidade = document.getElementById('quantidade').value;
+    const validade = document.getElementById('validade').value;
+
+    const validadeFormatada = formatarData(validade);
+    const status = calcularStatus(validade);
+
+    const novaLinha = document.createElement('tr');
+    novaLinha.innerHTML = `
+      <td>${produto}</td>
+      <td>${medida}</td>
+      <td>${quantidade}</td>
+      <td>${validadeFormatada}</td>
+      <td>${status}</td>
+      <td><button class="btn-danger">Apagar</button></td>
+    `;
+
+    document.querySelector("#produtosTabela tbody").appendChild(novaLinha);
+    event.target.reset();
+  });
+
+  document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('btn-danger')) {
+      event.target.closest('tr').remove();
+    }
+  });
+
+  function baixarExcel() {
+    const tabela = document.getElementById("produtosTabela");
+    const linhas = tabela.getElementsByTagName("tr");
+    const dados = [];
+
+    for (let i = 1; i < linhas.length; i++) {
+      const cols = linhas[i].getElementsByTagName("td");
+      const linha = [];
+
+      for (let j = 0; j < cols.length - 1; j++) {
+        linha.push(cols[j].innerText);
+      }
+      dados.push(linha);
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([["Produto", "Medida", "Quantidade", "Validade", "Status"], ...dados]);
+    XLSX.utils.book_append_sheet(wb, ws, "Produtos");
+    XLSX.writeFile(wb, "controle_validade.xlsx");
+  }
+</script>
+
+</body>
+</html>
