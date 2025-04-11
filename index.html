@@ -267,16 +267,23 @@
   const auth = firebase.auth();
 
   function login() {
-    const email = document.getElementById("email").value;
-    const senha = document.getElementById("senha").value;
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
 
-    auth.signInWithEmailAndPassword(email, senha)
-      .then(() => {
+  auth.signInWithEmailAndPassword(email, senha)
+    .then((userCredential) => {
+      const user = userCredential.user;
+      if (user.emailVerified) {
         document.getElementById("login-box").style.display = "none";
         document.getElementById("sistema").style.display = "block";
-      })
-      .catch(err => alert("Erro: " + err.message));
-  }
+      } else {
+        auth.signOut();
+        alert("Você precisa verificar seu e-mail antes de acessar o sistema.");
+      }
+    })
+    .catch(err => alert("Erro: " + err.message));
+}
+
 
   function logout() {
     auth.signOut().then(() => {
@@ -381,9 +388,16 @@ novaLinha.innerHTML = `
   }
 
   auth.createUserWithEmailAndPassword(email, senha)
-    .then(() => alert("Conta criada com sucesso!"))
+    .then(() => {
+      auth.currentUser.sendEmailVerification()
+        .then(() => {
+          alert("Conta criada! Verifique seu e-mail antes de fazer login.");
+          auth.signOut();
+        });
+    })
     .catch(err => alert("Erro ao criar conta: " + err.message));
 }
+
 
 function esqueciSenha() {
   const email = document.getElementById("email").value;
